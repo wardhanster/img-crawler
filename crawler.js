@@ -3,6 +3,11 @@ const cheerio = require('cheerio');
 const fs = require('fs');
 let imageCount = 0;
 
+const incrImageCount = () => {
+	imageCount++;
+	console.log(`\rTotal images written: ${imageCount}`);
+};
+
 async function crawlPage(url, depth, stream, isFirst) {
 	// console.log(`Crawling URL: ${url} at depth ${depth}`);
 	try {
@@ -11,25 +16,17 @@ async function crawlPage(url, depth, stream, isFirst) {
 		const $ = cheerio.load(html);
 		$('img').each((index, element) => {
 			const imageUrl = $(element).attr('src');
-			// console.log(`Image found: ${imageUrl}`);
+			if (!imageUrl.length) return;
 			if (!isFirst) {
 				stream.write(',\n');
 			}
-			stream.write(
-				JSON.stringify({
-					imageUrl,
-					sourceUrl: url,
-					depth,
-				})
-			);
-			imageCount++;
-			console.log(`\rTotal images written: ${imageCount}`);
+			stream.write(JSON.stringify({ imageUrl, sourceUrl: url, depth }));
 			isFirst = false;
+			incrImageCount();
 		});
 
 		$('a').each((index, element) => {
 			const link = $(element).attr('href');
-			// console.log(`Link found: ${link}`);
 			if (depth > 0 && link.startsWith('http')) {
 				crawlPage(link, depth - 1, stream, isFirst);
 			}
@@ -42,13 +39,13 @@ async function crawlPage(url, depth, stream, isFirst) {
 
 const startURL = process.argv[2];
 const depth = parseInt(process.argv[3]);
-
-const stream = fs.createWriteStream('results.json');
+const FILE_NAME = 'results.json';
+const stream = fs.createWriteStream(FILE_NAME);
 stream.write('{"results": [\n');
-
-crawlPage(startURL, depth, stream, true);
 
 process.on('exit', () => {
 	stream.write('\n]}');
 	stream.end();
 });
+
+crawlPage(startURL, depth, stream, true);
